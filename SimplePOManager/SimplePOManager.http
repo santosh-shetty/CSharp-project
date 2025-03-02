@@ -1,0 +1,6 @@
+@SimplePOManager_HostAddress = http://localhost:5148
+
+GET {{SimplePOManager_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
