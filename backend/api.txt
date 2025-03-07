@@ -1,0 +1,44 @@
+📌 User Endpoints (UsersController.cs)
+Method	Endpoint	Description
+GET	/api/users	Get all users
+GET	/api/users/{id}	Get a user by ID
+POST	/api/users	Create a new user
+PUT	/api/users/{id}	Update user details
+DELETE	/api/users/{id}	Delete a user
+
+📌 Supplier Endpoints (SuppliersController.cs)
+Method	Endpoint	Description
+GET	/api/suppliers	Get all suppliers
+GET	/api/suppliers/{id}	Get supplier by ID
+POST	/api/suppliers	Create new supplier
+PUT	/api/suppliers/{id}	Update supplier
+DELETE	/api/suppliers/{id}	Delete supplier
+
+📌 Purchase Order (PO) Endpoints (PurchaseOrdersController.cs)
+Method	Endpoint	Description
+GET	/api/purchaseorders	Get all purchase orders
+GET	/api/purchaseorders/{id}	Get purchase order by ID
+POST	/api/purchaseorders	Create a new purchase order
+PUT	/api/purchaseorders/{id}	Update purchase order
+DELETE	/api/purchaseorders/{id}	Delete purchase order
+
+📌 Purchase Order Items (PO Items) Endpoints (PoItemsController.cs)
+Method	Endpoint	Description
+GET	/api/poitems	Get all PO items
+GET	/api/poitems/{id}	Get PO item by ID
+POST	/api/poitems	Create a new PO item
+PUT	/api/poitems/{id}	Update PO item
+DELETE	/api/poitems/{id}	Delete PO item
+
+📌 Payment Endpoints (PaymentsController.cs)
+Method	Endpoint	Description
+GET	/api/payments	Get all payments
+GET	/api/payments/{id}	Get payment by ID
+POST	/api/payments	Create new payment
+PUT	/api/payments/{id}	Update payment
+DELETE	/api/payments/{id}	Delete payment
+
+📌 Audit Logs Endpoints (AuditLogsController.cs)
+Method	Endpoint	Description
+GET	/api/auditlogs	Get all audit logs
+GET	/api/auditlogs/{id}	Get audit log by ID
