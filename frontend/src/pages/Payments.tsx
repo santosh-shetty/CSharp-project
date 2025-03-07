@@ -1,21 +1,131 @@
-import React, { useState } from 'react';
-import { CreditCard, Plus, DollarSign } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Plus, DollarSign, AlertCircle } from 'lucide-react';
 import Modal from '../components/Modal';
+import api from '../lib/api';
+import { Payment, PurchaseOrder } from '../types';
 
 const Payments: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  
   const [formData, setFormData] = useState({
-    poNumber: '',
+    poId: '',
     amount: '',
-    paymentMethod: 'bank_transfer',
-    notes: ''
+    paymentMethod: 'bank_transfer'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchPayments();
+    fetchPurchaseOrders();
+  }, []);
+
+  const fetchPayments = async () => {
+    try {
+      const response = await api.get('/payments');
+      setPayments(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch payments');
+    }
+  };
+
+  const fetchPurchaseOrders = async () => {
+    try {
+      const response = await api.get('/purchaseorders');
+      setPurchaseOrders(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch purchase orders');
+    }
+  };
+
+  const handlePOChange = async (poId: string) => {
+    setFormData({ ...formData, poId });
+    if (poId) {
+      const po = purchaseOrders.find(p => p.id.toString() === poId);
+      setSelectedPO(po || null);
+    } else {
+      setSelectedPO(null);
+    }
+  };
+
+  const calculateRemainingBalance = (poId: number): number => {
+    const po = purchaseOrders.find(p => p.id === poId);
+    if (!po) return 0;
+
+    const paidAmount = payments
+      .filter(p => p.purchaseOrder.id === poId && p.status === 'paid')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    return po.totalAmount - paidAmount;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
-    setIsModalOpen(false);
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (!formData.poId) {
+        setError('Please select a purchase order');
+        setIsLoading(false);
+        return;
+      }
+
+      const amount = parseFloat(formData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        setError('Please enter a valid amount');
+        setIsLoading(false);
+        return;
+      }
+
+      const remainingBalance = calculateRemainingBalance(parseInt(formData.poId));
+      if (amount > remainingBalance) {
+        setError(`Payment amount exceeds remaining balance of $${remainingBalance.toFixed(2)}`);
+        setIsLoading(false);
+        return;
+      }
+
+      await api.post('/payments', {
+        poId: parseInt(formData.poId),
+        amount: amount,
+        paymentMethod: formData.paymentMethod
+      });
+
+      await fetchPayments();
+      setIsModalOpen(false);
+      resetForm();
+    } catch (err: any) {
+      console.error('Error creating payment:', err.response?.data);
+      setError(err.response?.data?.message || 'Failed to create payment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      await api.put(`/payments/${id}/status`, JSON.stringify(status), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      await fetchPayments();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update payment status');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      poId: '',
+      amount: '',
+      paymentMethod: 'bank_transfer'
+    });
+    setSelectedPO(null);
+    setError('');
   };
 
   return (
@@ -66,36 +176,51 @@ const Payments: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  <tr>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                      <div className="flex items-center">
-                        <DollarSign className="h-5 w-5 text-gray-400 mr-2" />
-                        PAY-2024-001
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      PO-2024-001
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      $5,000.00
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                        Completed
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      2024-02-28
-                    </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <button className="text-indigo-600 hover:text-indigo-900 mr-4">
-                        View
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Void
-                      </button>
-                    </td>
-                  </tr>
+                  {payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                        <div className="flex items-center">
+                          <DollarSign className="h-5 w-5 text-gray-400 mr-2" />
+                          {payment.id}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {payment.purchaseOrder.poNumber}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        ${payment.amount.toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                        <select
+                          value={payment.status}
+                          onChange={(e) => handleUpdateStatus(payment.id, e.target.value)}
+                          className={`rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                            payment.status === 'pending' ? 'bg-yellow-50 text-yellow-700 ring-yellow-600/20' :
+                            payment.status === 'paid' ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                            'bg-red-50 text-red-700 ring-red-600/20'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="paid">Paid</option>
+                          <option value="failed">Failed</option>
+                        </select>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {new Date(payment.paymentDate).toLocaleDateString()}
+                      </td>
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <button 
+                          onClick={() => {
+                            setSelectedPayment(payment);
+                            setViewModalOpen(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -109,18 +234,36 @@ const Payments: React.FC = () => {
         title="Record Payment"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-md bg-red-50 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                </div>
+              </div>
+            </div>
+          )}
           <div>
-            <label htmlFor="poNumber" className="block text-sm font-medium text-gray-700">
-              Purchase Order Number
+            <label htmlFor="poId" className="block text-sm font-medium text-gray-700">
+              Purchase Order
             </label>
-            <input
-              type="text"
-              id="poNumber"
-              value={formData.poNumber}
-              onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
+            <select
+              id="poId"
+              value={formData.poId}
+              onChange={(e) => handlePOChange(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               required
-            />
+            >
+              <option value="">Select a purchase order</option>
+              {purchaseOrders.map((po) => (
+                <option key={po.id} value={po.id}>
+                  {po.poNumber} - {po.supplier.name} (${po.totalAmount.toFixed(2)})
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
@@ -159,24 +302,40 @@ const Payments: React.FC = () => {
               <option value="cash">Cash</option>
             </select>
           </div>
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-              Notes
-            </label>
-            <textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-          </div>
+          {selectedPO && (
+            <div className="mt-4 rounded-md bg-gray-50 p-4">
+              <h4 className="text-sm font-medium text-gray-900">Purchase Order Details</h4>
+              <dl className="mt-2 grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Supplier</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{selectedPO.supplier.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Total Amount</dt>
+                  <dd className="mt-1 text-sm text-gray-900">${selectedPO.totalAmount.toFixed(2)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Status</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{selectedPO.status}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Remaining Balance</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    ${(selectedPO.totalAmount - (payments
+                      .filter(p => p.purchaseOrder.id === selectedPO.id && p.status === 'paid')
+                      .reduce((sum, p) => sum + p.amount, 0))).toFixed(2)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <button
               type="submit"
-              className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+              disabled={isLoading}
+              className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Record Payment
+              {isLoading ? 'Recording...' : 'Record Payment'}
             </button>
             <button
               type="button"
@@ -187,6 +346,87 @@ const Payments: React.FC = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setSelectedPayment(null);
+        }}
+        title="Payment Details"
+      >
+        {selectedPayment && (
+          <div className="space-y-6">
+            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg">
+              <dt className="text-sm font-medium text-gray-500">Payment ID</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{selectedPayment.id}</dd>
+            </div>
+
+            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg border border-gray-200">
+              <dt className="text-sm font-medium text-gray-500">Purchase Order</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                <p className="font-semibold">{selectedPayment.purchaseOrder.poNumber}</p>
+                <p className="text-gray-500">{selectedPayment.purchaseOrder.supplier.name}</p>
+              </dd>
+            </div>
+
+            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg">
+              <dt className="text-sm font-medium text-gray-500">Amount</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                ${selectedPayment.amount.toFixed(2)}
+              </dd>
+            </div>
+
+            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg border border-gray-200">
+              <dt className="text-sm font-medium text-gray-500">Payment Method</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                {selectedPayment.paymentMethod.split('_').map(word => 
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ')}
+              </dd>
+            </div>
+
+            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg">
+              <dt className="text-sm font-medium text-gray-500">Status</dt>
+              <dd className="mt-1 sm:col-span-2 sm:mt-0">
+                <select
+                  value={selectedPayment.status}
+                  onChange={(e) => handleUpdateStatus(selectedPayment.id, e.target.value)}
+                  className={`rounded-md px-2 py-1 text-sm font-medium ring-1 ring-inset ${
+                    selectedPayment.status === 'pending' ? 'bg-yellow-50 text-yellow-700 ring-yellow-600/20' :
+                    selectedPayment.status === 'paid' ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                    'bg-red-50 text-red-700 ring-red-600/20'
+                  }`}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </dd>
+            </div>
+
+            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 rounded-lg border border-gray-200">
+              <dt className="text-sm font-medium text-gray-500">Payment Date</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                {new Date(selectedPayment.paymentDate).toLocaleString()}
+              </dd>
+            </div>
+
+            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewModalOpen(false);
+                  setSelectedPayment(null);
+                }}
+                className="inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
