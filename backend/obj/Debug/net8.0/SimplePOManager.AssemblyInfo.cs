@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SimplePOManager")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6fcc07205cf4f0d89196b571e477a0de03bbe105")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7592bb2c56181d323ee8c7f844cdea29aa8ac4ec")]
 [assembly: System.Reflection.AssemblyProductAttribute("SimplePOManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SimplePOManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
