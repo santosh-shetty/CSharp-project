@@ -16,22 +16,21 @@ export interface Supplier {
 }
 
 export interface PurchaseOrder {
-  id: string;
-  supplierId: string;
-  orderNumber: string;
-  status: 'draft' | 'pending' | 'approved' | 'completed' | 'cancelled';
+  id: number;
+  poNumber: string;
+  orderDate: string;
+  status: 'pending' | 'approved' | 'completed' | 'cancelled';
   totalAmount: number;
-  createdAt: string;
+  supplier: Supplier;
   createdBy: string;
+  items: PoItem[];
 }
 
-export interface PurchaseOrderItem {
-  id: string;
-  purchaseOrderId: string;
-  description: string;
+export interface PoItem {
+  id: number;
+  itemName: string;
   quantity: number;
   unitPrice: number;
-  totalPrice: number;
 }
 
 export interface Payment {
