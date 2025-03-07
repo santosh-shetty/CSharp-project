@@ -8,12 +8,11 @@ export interface User {
 }
 
 export interface Supplier {
-  id: string;
+  id: number;
   name: string;
   email: string;
-  phone: string;
-  address: string;
-  createdAt: string;
+  phone?: string;
+  address?: string;
 }
 
 export interface PurchaseOrder {

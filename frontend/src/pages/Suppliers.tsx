@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
-import { Building2, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Building2, Plus, Pencil, Trash2 } from 'lucide-react';
 import Modal from '../components/Modal';
+import api from '../lib/api';
+import { Supplier } from '../types';
 
 const Suppliers: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [editingSupplierId, setEditingSupplierId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -11,11 +17,76 @@ const Suppliers: React.FC = () => {
     address: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch suppliers on component mount
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  const fetchSuppliers = async () => {
+    try {
+      const response = await api.get('/suppliers');
+      setSuppliers(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch suppliers');
+    }
+  };
+
+  const handleEdit = (supplier: Supplier) => {
+    setEditingSupplierId(supplier.id);
+    setFormData({
+      name: supplier.name,
+      email: supplier.email,
+      phone: supplier.phone || '',
+      address: supplier.address || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this supplier?')) return;
+
+    try {
+      await api.delete(`/suppliers/${id}`);
+      await fetchSuppliers(); // Refresh the list
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete supplier');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
-    setIsModalOpen(false);
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (editingSupplierId) {
+        // Update existing supplier
+        await api.put(`/suppliers/${editingSupplierId}`, formData);
+      } else {
+        // Create new supplier
+        await api.post('/suppliers', formData);
+      }
+
+      await fetchSuppliers(); // Refresh the list
+      setIsModalOpen(false);
+      resetForm();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 
+              `Failed to ${editingSupplierId ? 'update' : 'create'} supplier`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      address: ''
+    });
+    setEditingSupplierId(null);
+    setError('');
   };
 
   return (
@@ -64,31 +135,41 @@ const Suppliers: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  <tr>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                      <div className="flex items-center">
-                        <Building2 className="h-5 w-5 text-gray-400 mr-2" />
-                        Sample Supplier
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      contact@supplier.com
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      (555) 123-4567
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      123 Business St, City, State
-                    </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <button className="text-indigo-600 hover:text-indigo-900 mr-4">
-                        Edit
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                  {suppliers.map((supplier) => (
+                    <tr key={supplier.id}>
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                        <div className="flex items-center">
+                          <Building2 className="h-5 w-5 text-gray-400 mr-2" />
+                          {supplier.name}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {supplier.email}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {supplier.phone}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {supplier.address}
+                      </td>
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <button 
+                          onClick={() => handleEdit(supplier)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4 inline-flex items-center"
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(supplier.id)}
+                          className="text-red-600 hover:text-red-900 inline-flex items-center"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -99,7 +180,7 @@ const Suppliers: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Add Supplier"
+        title={editingSupplierId ? 'Edit Supplier' : 'Add Supplier'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -154,16 +235,24 @@ const Suppliers: React.FC = () => {
               required
             />
           </div>
+          {error && (
+            <div className="text-red-600 text-sm mb-4">{error}</div>
+          )}
+
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <button
               type="submit"
-              className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+              disabled={isLoading}
+              className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save
+              {isLoading ? 'Saving...' : 'Save'}
             </button>
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                resetForm();
+              }}
               className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
             >
               Cancel
