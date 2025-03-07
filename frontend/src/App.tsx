@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Provider } from 'react-redux';
 import { store } from './store';
 import Layout from './components/Layout';
+import Register from './pages/Register';
 
 // Lazy load components
 const Login = React.lazy(() => import('./pages/Login'));
@@ -24,6 +25,7 @@ function App() {
         }>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="suppliers" element={<Suppliers />} />
